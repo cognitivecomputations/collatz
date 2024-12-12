@@ -1,0 +1,14 @@
+name = "collatz"
+version = "0.1.0"
+defaultTargets = ["collatz"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+
+[[lean_lib]]
+name = "Collatz"
+
+[[lean_exe]]
+name = "collatz"
+root = "Main"
