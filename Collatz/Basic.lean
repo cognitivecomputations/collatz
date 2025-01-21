@@ -74,7 +74,7 @@ theorem odd_gives_even {n : Nat} (hodd : Odd n) : Even (collatz n) := by
 /--
 If `collatzIter n k` is even, then `collatzIter n (k+1)` equals `(collatzIter n k)/2`.
 -/
-theorem even_step_div2 {n k : Nat} (hn : n > 0) (heven : Even (collatzIter n k)) :
+theorem even_step_div2 {n k : Nat} (heven : Even (collatzIter n k)) :
   collatzIter n (k+1) = (collatzIter n k) / 2 := by
   rw [collatzIter, collatz]
   have : (collatzIter n k) % 2 = 0 := even_iff.mp heven
@@ -87,19 +87,21 @@ that is strictly smaller.
 Specifically: from `collatzIter n k = val ≥ 4` even, we jump ahead 1 or 2 steps
 and get a strictly smaller even value in the sequence.
 -/
-theorem boundedGrowthBetweenEven
-    {n k : Nat} (hn : n > 0)
-    (val := collatzIter n k)
-    (heven : Even val)
-    (hge4 : val ≥ 4) :
+theorem boundedGrowthBetweenEven {n k : Nat}
+    (hn : n > 0)
+    (heven : Even (collatzIter n k))
+    (hge4 : collatzIter n k ≥ 4) :
   ∃ j, j > k ∧ Even (collatzIter n j) ∧ collatzIter n j < val := by
+
+  let val := collatzIter n k
+
   -- We'll do a case split on whether (k+1)-th iterate is odd or even.
   by_cases h_next_odd : Odd (collatzIter n (k+1))
   ·
     -- If (k+1) is odd => then (k+2) is even
     -- Step 1: (k+1) = val/2 (by even_step_div2)
     have step_k1 : collatzIter n (k+1) = val / 2 := by
-      apply even_step_div2 hn heven
+      apply even_step_div2 heven
     let val1 := val / 2
     -- Step 2: (k+2) = 3*val1 + 1 (by odd_step_exact)
     have step_k2 : collatzIter n (k+2) = 3*val1 + 1 := by
