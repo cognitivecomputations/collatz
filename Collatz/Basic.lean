@@ -55,8 +55,9 @@ For an odd value `n`, we have `collatz n = 3n + 1`.
 theorem odd_step_exact {n : Nat} (hodd : Odd n) :
   collatz n = 3*n + 1 := by
   rw [collatz]
-  have h : n % 2 ≠ 0 := odd_iff.mp hodd
-  rw [if_neg h]
+  have h1 : n % 2 = 1 := odd_iff.mp hodd
+  have h2 : n % 2 ≠ 0 := (Nat.mod_two_ne_zero.mpr h1)
+  rw [if_neg h2]
 
 /--
 If `n` is odd, then `collatz n` is even.
@@ -64,8 +65,10 @@ If `n` is odd, then `collatz n` is even.
 theorem odd_gives_even {n : Nat} (hodd : Odd n) : Even (collatz n) := by
   rcases hodd with ⟨k, rfl⟩  -- n = 2k+1
   rw [collatz]
-  have : (2*k + 1) % 2 = 1 := by simp
-  rw [if_neg (by decide)]
+  have h1 : (2*k + 1) % 2 = 1 := by
+    rw [add_mod, mul_mod]
+    simp
+  rw [if_neg (mod_two_ne_zero.mpr h1)]
   exact ⟨3*k + 2, by ring⟩
 
 /--
