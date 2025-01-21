@@ -72,31 +72,43 @@ theorem even_step_decrease {n k : Nat} (hn : n > 0) (heven : Even (collatzIter n
   have : (collatzIter n k) % 2 = 0 := Nat.even_iff.mp heven
   rw [if_pos this]
 
-/-- Between even steps, find a smaller value -/
 theorem bounded_growth_between_even {n : Nat} (hn : n > 0) :
-  ∀ k, Even (collatzIter n k) →
+  ∀ k, Even (collatzIter n k) → collatzIter n k > 2 →
   ∃ j, j > k ∧ Even (collatzIter n j) ∧ collatzIter n j < collatzIter n k := by
-  intros k heven
+  intros k heven hgt
   by_cases h_next_odd : Odd (collatzIter n (k+1))
-  · -- If next is odd, (k+2) is even and smaller
+  · -- If (k+1) is odd, go to (k+3) which will be smaller
     have h_even_k2 : Even (collatzIter n (k+2)) := odd_gives_even h_next_odd
-    use k+2
+    use k+3
     constructor; linarith
-    constructor; exact h_even_k2
-    let val := collatzIter n k
-    have val_div := even_step_decrease hn heven
-    rw [val_div] at h_next_odd
-    suffices (3*(val/2)+1)/2<val by exact this
-    have : 3*(val/2)+1 ≤3*(val/2)+val/2 := by
-      have :1 ≤ val/2 := by linarith
-      linarith
-    linarith
-  · -- If next is even, (k+1) is even and smaller
+    constructor
+    · exact Nat.even_div h_even_k2 (by norm_num)
+    · -- Show (k+3) < k by tracking value
+      let val := collatzIter n k
+      have val_div := even_step_decrease hn heven
+      have eq_kplus2 : collatzIter n (k+2) = 3*(val/2) + 1 := by
+        rw [collatzIter, val_div, odd_step_exact h_next_odd]
+      have eq_kplus3 : collatzIter n (k+3) = (3*(val/2) + 1)/2 := by
+        rw [collatzIter, eq_kplus2, collatz]
+        rw [if_pos (Nat.even_iff.mp h_even_k2)]
+      rw [eq_kplus3]
+
+      -- Let m = val/2, then val = 2m since val is even
+      let m := val/2
+      have h3 : 3*m + 1 < 4*m := by linarith
+      -- Since (3*m+1) < 4*m, integer division by 2 gives strict inequality
+      have : (3*m + 1)/2 < 2*m :=
+        Nat.lt_of_le_of_lt (Nat.div_le_div_right h3.le) (by simp)
+      -- Finally convert back to val = 2m
+      rw [←Nat.mul_div_cancel_left m (by decide)]
+      exact this
+  · -- If (k+1) is even, then it's smaller
     use k+1
     constructor; linarith
-    constructor;exact Nat.not_odd_iff_even.mp h_next_odd
+    constructor; exact Nat.not_odd_iff_even.mp h_next_odd
     rw [even_step_decrease hn heven]
-    exact Nat.div_lt_self (by linarith) (by norm_num)
+    exact Nat.div_lt_self hgt (by norm_num)
+
 
 /-- From any value >1, find a smaller value -/
 theorem reach_smaller {n k : Nat} (hn : n > 0) (hgt : collatzIter n k > 1) :
