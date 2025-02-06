@@ -1,9 +1,3 @@
-/-
-The proof of the Collatz conjecture hinges on demonstrating that for any integer \( n > 1 \), there exists a \( k \) such that \( F^k(n) < n \), where \( F^k \) denotes the \( k \)-th iterate of the Collatz function \( F \). The proof proceeds by contradiction. We assume that there exists some \( n > 1 \) for which \( F^k(n) \ge n \) for all \( k \). Under this assumption, a surprising consequence emerges regarding the 2-adic valuation \(\nu_2(n+1)\) (i.e., the exponent of 2 in the prime factorization of \( n+1 \)): if the sequence never descends below \( n \), then \(\nu_2(n+1)\) must be infinite, which is impossible since \( n+1 \) is finite.
-To arrive at this conclusion, the proof examines the behavior of \(\nu_2(F^i(n)+1)\) for successive iterates \( i \). A key lemma shows that if \( 2^j \) divides \( n+1 \) but \( 2^{j+1} \) does not (i.e., \(\nu_2(n+1)=j\)), then there must exist a \( k \) such that \( F^k(n) < n \). This lemma is proven by induction on \( j \).
-Thus, by assuming that no iterate drops below \( n \), we derive inductively that \( n+1 \) must be divisible by arbitrarily large powers of 2—implying that \(\nu_2(n+1)=\infty\). This contradiction establishes that for every \( n > 1 \) there is indeed some \( k \) with \( F^k(n) < n \). Finally, the full Collatz conjecture follows by applying strong induction on \( n \). The argument is akin to descending a staircase: while individual steps might sometimes rise, the overall trend must be downward.
--/
-
 import Mathlib
 
 open Nat
@@ -21,6 +15,11 @@ def F : ℕ → ℕ → ℕ
 | 0,     n => n
 | (k+1), n => F k (f n)
 
+def F_add (k₁ k₂ : ℕ) (n : ℕ) : F (k₁ + k₂) n = F k₁ (F k₂ n) := by
+  induction k₂ generalizing n with
+  | zero => rfl
+  | succ k ih => rw [← add_assoc, F, ih, F]
+
 /- Basic properties of f -/
 lemma f_even {n : ℕ} (h : n % 2 = 0) : f n = n / 2 := by
   simp [f, h]
@@ -28,17 +27,58 @@ lemma f_even {n : ℕ} (h : n % 2 = 0) : f n = n / 2 := by
 lemma f_odd {n : ℕ} (h : n % 2 = 1) : f n = 3 * n + 1 := by
   simp [f, h]
 
+/- If n ≡ 1 (mod 4) and n > 1, then in three steps of f the value drops below n. -/
+lemma collatz_mod4_drop {n : ℕ} (h4 : n % 4 = 1) (hn : 1 < n) : F 3 n < n := by
+  -- Express n as 4k + 1
+  have hk : n = 4 * (n / 4) + 1 := by rw [← h4, Nat.div_add_mod]
+  set k := n / 4
+  -- n is odd (since n ≡ 1 mod 4)
+  have h₂ : n % 2 = 1 := odd_of_mod_four_eq_one h4
+  -- Compute f n
+  have f1 : f n = 3 * n + 1 := f_odd h₂
+  -- 3n + 1 is divisible by 4, since n = 4k + 1
+  have hdiv4 : 4 ∣ 3 * n + 1 := by
+    rw [hk]
+    rw [mul_add, ← mul_assoc, add_assoc]
+    rw [mul_comm 3, mul_assoc, ← mul_add_one]
+    exact dvd_mul_right 4 (3 * k + 1)
+  -- Compute f (f n)
+  have f2 : f (f n) = (3 * n + 1) / 2 := by
+    rw [f1]
+    -- 3n + 1 is even (since n is odd)
+    have : (3 * n + 1) % 2 = 0 := by omega
+    simp [f, this]
+  -- (3n + 1) / 2 is even (because 4 | (3n+1))
+  have : ((3 * n + 1) / 2) % 2 = 0 := by
+    apply Nat.mod_eq_zero_of_dvd
+    exact Nat.dvd_div_of_mul_dvd hdiv4
+  -- Compute f (f (f n))
+  have f3 : f (f (f n)) = (3 * n + 1) / 4 := by
+    rw [f2]
+    simp [f, this]
+    rw [Nat.div_div_eq_div_mul]
+  -- Simplify (3n+1)/4 using n = 4k+1
+  conv at f3 => rhs; rw [hk]
+  -- At this point, (3n+1)/4 = 3k + 1
+  have f3val : f (f (f n)) = 3 * k + 1 := by omega
+  -- Since k ≥ 1 (because n > 1), we have 3k + 1 < 4k + 1 = n
+  have kpos : 0 < k := by omega
+  have : 3 * k + 1 < 4 * k + 1 := by omega
+  rw [← hk] at this
+  -- Thus F 3 n = 3*k + 1 < n
+  simp [F]
+  rw [f3val]
+  exact this
+
 /- If n+1 is divisible by 2^j but not by 2^(j+1), then there is a drop below n at some step. -/
 lemma collatz_drop_aux (j n : ℕ) (hdiv : 2^j ∣ n + 1) (hndiv : ¬ 2^(j+1) ∣ n + 1) (hn : 1 < n) :
-∃ k, F k n < n := by
-  induction j with
+    ∃ k, F k n < n := by
+  induction j generalizing n with
   | zero =>
     -- j = 0 means n+1 is not divisible by 2, so n+1 is odd, hence n is even.
-    have : n % 2 = 0 := by
-      -- If n were odd, n+1 would be even, which contradicts ¬2^1 ∣ n+1 when j=0 (2^1 = 2).
-      by_contra nodd
-      simp [Nat.even_iff, nodd] at hndiv
+    have : n % 2 = 0 := by omega
     use 1
+    simp [F]
     rw [f_even this]
     -- n / 2 < n for n > 1
     exact Nat.div_lt_self (Nat.zero_lt_of_lt hn) (by decide)
@@ -47,15 +87,12 @@ lemma collatz_drop_aux (j n : ℕ) (hdiv : 2^j ∣ n + 1) (hndiv : ¬ 2^(j+1) �
     -- So v2(n+1) = j+1 ≥ 1, meaning n is odd.
     have hodd : n % 2 = 1 := by
       by_contra neven
-      have : 2 ∣ n := Nat.even_iff.2 neven
+      have : 2 ∣ n := by omega
       rw [Nat.dvd_iff_mod_eq_zero] at this
-      rw [this] at hdiv
+      rw [Nat.pow_succ, mul_comm] at hdiv
       -- Now n+1 is divisible by 2^(j+1) ≥ 2^1, so in particular 2 ∣ n+1.
       have : 2 ∣ n + 1 := dvd_of_mul_right_dvd hdiv
-      rw [Nat.dvd_iff_mod_eq_zero] at this
-      -- n even gives n+1 ≡ 1 mod 2, contradiction with 2 ∣ n+1.
-      rw [Nat.mod_two_of_dvd (Nat.dvd_refl (n + 1))] at this
-      contradiction
+      omega
     -- Perform one Collatz cycle (two steps) to get new value n1
     let n1 := F 2 n
     -- Compute n1 explicitly: n1 = f(f n) = (3n + 1) / 2
@@ -63,57 +100,62 @@ lemma collatz_drop_aux (j n : ℕ) (hdiv : 2^j ∣ n + 1) (hndiv : ¬ 2^(j+1) �
       dsimp [n1, F]
       rw [f_odd hodd, f_even]
       · -- justify (3n+1) is even
-        have : (3 * n + 1) % 2 = 0 := by
-          calc (3 * n + 1) % 2 = ((3 * n) % 2 + 1 % 2) % 2 := Nat.add_mod _ _ _
-          _   = ((3 % 2) * (n % 2) + 1) % 2 := by rw [Nat.mul_mod]; rfl
-          _   = (1 * 1 + 1) % 2 := by rw [hodd]; rfl
-          _   = 0 % 2 := by norm_num
-        exact this
-      · simp  -- n1's argument (3n+1) is even, so second step uses f_even
+        omega
     -- Now n1 + 1 = 3(n+1)/2.
     obtain ⟨t, ht⟩ := hdiv
     -- We know ¬2^(j+2) ∣ n+1, so t must be odd.
     have todd : t % 2 = 1 := by
       by_contra teven
-      rcases Nat.even_iff.1 teven with ⟨u, hu⟩
+      have : 2 ∣ t := by omega
+      rcases this with ⟨u, hu⟩
       rw [ht, hu, ← mul_assoc, pow_succ] at hndiv
       exact hndiv ⟨u, rfl⟩
+    have abc : n1 + 1 = 3 * 2^j * t := by
+      rw [n1_def, ← add_div_right, add_assoc, ← mul_add_one]
+      rw [ht, pow_succ, ← mul_assoc, ← mul_assoc, mul_right_comm, Nat.mul_div_cancel]
+      decide
+      decide
     -- Derive divisibility for n1 + 1.
     have hdiv_n1 : 2^j ∣ n1 + 1 := by
-      rw [n1_def, ht]
       -- n1 + 1 = 3 * (n+1) / 2 = 3 * 2^j * t
-      have : n1 + 1 = 3 * 2^j * t := by
-        rw [n1_def, ht]; ring
-      exact dvd_mul_left (2^j) (3 * t)
+      rw [abc, ← mul_rotate]
+      exact dvd_mul_left (2^j) (t * 3)
     have hndiv_n1 : ¬ 2^(j+1) ∣ n1 + 1 := by
       intro H
       rcases H with ⟨m, hm⟩
-      rw [n1_def, ht] at hm
+      --rw [n1_def, ht] at hm
       -- Now 3 * 2^j * t = 2^(j+1) * m. Cancel 2^j:
       have eq_cancel : 2^j * (3 * t) = 2^j * (2 * m) := by
-        apply (Nat.mul_right_inj (pow_pos (by decide) j))
-        calc 2^j * (3 * t) = 3 * 2^j * t := by rw [mul_assoc]
-        _   = 2 * 2^j * m := by rw [← hm]; ring
-        _   = 2^j * (2 * m) := by rw [mul_assoc]
-      have eq_small : 3 * t = 2 * m := eq_cancel
+        --rw [Nat.mul_right_inj (NeZero.ne _)]
+        calc 2^j * (3 * t) = 3 * 2^j * t := by rw [mul_left_comm, mul_assoc]
+        _   = 2 * 2^j * m := by rw [mul_comm 2, ← Nat.pow_add_one, ← hm, abc]
+        _   = 2^j * (2 * m) := by rw [mul_left_comm, mul_assoc]
+      have eq_small : 3 * t = 2 * m := (Nat.mul_right_inj (a := 2^j) (NeZero.ne _)).mp eq_cancel
       -- Left side is odd (t is odd), right side is even, impossible.
       have mod_contra : (3 * t) % 2 = (2 * m) % 2 := congr_arg (· % 2) eq_small
-      rw [Nat.mul_mod, todd, Nat.mul_mod, Nat.zero_mod] at mod_contra
-      simp only [mul_one, one_mul] at mod_contra
-      exact Nat.one_ne_zero mod_contra
+      rw [Nat.mul_mod_right] at mod_contra
+      rw [← Nat.even_iff] at mod_contra
+      have : Odd (3 * t) := by
+        apply Odd.mul
+        decide
+        rw [Nat.odd_iff]
+        exact todd
+      exact absurd mod_contra (not_even_iff_odd.mpr this)
     -- Now apply the induction hypothesis to n1.
-    obtain ⟨k1, drop_n1⟩ := ih hdiv_n1 hndiv_n1 (by
+    obtain ⟨k1, drop_n1⟩ := ih n1 hdiv_n1 hndiv_n1 (by
       -- show 1 < n1
       rw [n1_def]
-      apply Nat.div_pos
-      · linarith [hn]
-      · decide )
+      rw [Nat.lt_div_iff_mul_lt (by decide)]
+      omega
+    )
     -- Using induction result: ∃ k1, F k1 n1 < n1.
     -- Then F (2 + k1) n = F k1 (F 2 n) = F k1 n1 < n1.
     use 2 + k1
-    have step_comp : F (2 + k1) n = F k1 (F 2 n) := by rw [F]
-    rw [← step_comp]
-    exact drop_n1.trans (Nat.div_mul_le_self (3 * n + 1) 2)
+    have step_comp : F (2 + k1) n = F k1 (F 2 n) := Nat.add_comm _ _ ▸ F_add _ _ _
+    rw [step_comp]
+    refine drop_n1.trans ?_
+    --(Nat.div_mul_le_self (3 * n + 1) 2)
+    sorry
 
 theorem exists_collatz_descent (n : ℕ) (h : 1 < n) : ∃ k, F k n < n := by
   -- We proceed by contradiction on the negation: assume ∀ k, F k n ≥ n (no drop ever).
