@@ -163,7 +163,7 @@ lemma collatz_drop_aux (j n : ℕ) (hdiv : 2^j ∣ n + 1) (hndiv : ¬ 2^(j+1) �
     rw [← step_comp]
     exact drop_n1.trans (Nat.div_mul_le_self (3 * n + 1) 2)
 
-theorem exists_k_f_k_n_lt_n (n : ℕ) (h : 1 < n) : ∃ k, F k n < n := by
+theorem exists_collatz_descent (n : ℕ) (h : 1 < n) : ∃ k, F k n < n := by
   -- We proceed by contradiction on the negation: assume ∀ k, F k n ≥ n (no drop ever).
   by_contra H
   push_neg at H
@@ -222,8 +222,8 @@ theorem collatz_conjecture (n : ℕ) (h₀ : 0 < n) : ∃ k, F k n = 1 := by
     rw [h1, F]
   | inr h1 =>
     -- Inductive step: Assume true for all m < n. Need to show it for n > 1.
-    -- By exists_k_f_k_n_lt_n, there exists k such that F k n < n.
-    obtain ⟨k, hk⟩ := exists_k_f_k_n_lt_n n h1
+    -- By exists_collatz_descent, there exists k such that F k n < n.
+    obtain ⟨k, hk⟩ := exists_collatz_descent n h1
     -- By induction hypothesis (strong induction), the conjecture is true for F k n.
     -- So there exists k1 such that F k1 (F k n) = 1.
     obtain ⟨k1, hk1⟩ := ih (F k n) hk (Nat.zero_lt_of_lt hk)
