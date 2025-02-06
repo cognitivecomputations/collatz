@@ -2,242 +2,235 @@ import Mathlib
 
 open Nat
 
-/--
-The Collatz function:
-- If `n` is even, divide by 2;
-- If `n` is odd, multiply by 3 and add 1.
--/
-def collatz (n : Nat) : Nat :=
-  if n % 2 = 0 then n / 2 else 3*n + 1
+/- Collatz function (one step) -/
+def f (n : ℕ) : ℕ :=
+  if n % 2 == 0 then n / 2 else 3 * n + 1
 
-/--
-`collatzIter n k` iterates the Collatz function `k` times starting from `n`.
--/
-def collatzIter (n : Nat) : Nat → Nat
-| 0   => n
-| k+1 => collatz (collatzIter n k)
+/- Accelerated function: one or two steps (odd step followed by one division) -/
+def T (n : ℕ) : ℕ :=
+  if n % 2 == 0 then n / 2 else (3 * n + 1) / 2
 
-/--
-If `n > 0`, then every Collatz iterate remains strictly positive.
--/
-theorem collatzIter_pos {n k : Nat} (hn : n > 0) : collatzIter n k > 0 := by
-  induction k with
-  | zero => exact hn
-  | succ k ih =>
-    rw [collatzIter, collatz]
-    by_cases h : collatzIter n k % 2 = 0
-    · -- Even case
-      rw [if_pos h]
-      rcases even_iff.mpr h with ⟨m, hm⟩
-      change (collatzIter n k)/2 > 0
-      rw [hm, ← two_mul m]
-      cases m with
-      | zero =>
-        simp at hm
-        rw [hm] at ih
-        exact (lt_irrefl 0 ih).elim
-      | succ m' =>
-        have h2_pos : 0 < (2:Nat) := by
-          exact Nat.zero_lt_two
-        have div_eq : (succ m' * 2) / 2 = succ m' :=
-          Nat.mul_div_cancel (succ m') h2_pos
-        rw [mul_comm (succ m') 2] at div_eq
-        rw [div_eq]
-        exact succ_pos m'
+/- Recurrence F: k-th iterate of f (apply f k times) -/
+def F : ℕ → ℕ → ℕ
+| 0,     n => n
+| (k+1), n => F k (f n)
 
-    · -- Odd case
-      rw [if_neg h]
-      exact succ_pos (3*collatzIter n k)
+/- Basic properties of f -/
+lemma f_even {n : ℕ} (h : n % 2 = 0) : f n = n / 2 := by
+  simp [f, h]
 
-/--
-For an odd value `n`, we have `collatz n = 3n + 1`.
--/
-theorem odd_step_exact {n : Nat} (hodd : Odd n) :
-  collatz n = 3*n + 1 := by
-  rw [collatz]
-  have h1 : n % 2 = 1 := odd_iff.mp hodd
-  have h2 : n % 2 ≠ 0 := (Nat.mod_two_ne_zero.mpr h1)
-  rw [if_neg h2]
+lemma f_odd {n : ℕ} (h : n % 2 = 1) : f n = 3 * n + 1 := by
+  simp [f, h]
 
-/--
-If `n` is odd, then `collatz n` is even.
--/
-theorem odd_gives_even {n : Nat} (hodd : Odd n) : Even (collatz n) := by
-  rcases hodd with ⟨k, rfl⟩  -- n = 2k+1
-  rw [collatz]
-  have h1 : (2*k + 1) % 2 = 1 := by
-    rw [add_mod, mul_mod]
-    simp
-  rw [if_neg (mod_two_ne_zero.mpr h1)]
-  exact ⟨3*k + 2, by ring⟩
-
-/--
-If `collatzIter n k` is even, then `collatzIter n (k+1)` equals `(collatzIter n k)/2`.
--/
-theorem even_step_div2 {n k : Nat} (heven : Even (collatzIter n k)) :
-  collatzIter n (k+1) = (collatzIter n k) / 2 := by
-  rw [collatzIter, collatz]
-  have : (collatzIter n k) % 2 = 0 := even_iff.mp heven
-  rw [if_pos this]
-
-/--
-For an **even value** `≥ 4`, we can find a later even value in the Collatz sequence
-that is strictly smaller.
-
-Specifically: from `collatzIter n k = val ≥ 4` even, we jump ahead 1 or 2 steps
-and get a strictly smaller even value in the sequence.
--/
-theorem boundedGrowthBetweenEven {n k : Nat}
-    (hn : n > 0)
-    (heven : Even (collatzIter n k))
-    (hge4 : collatzIter n k ≥ 4) :
-  ∃ j, j > k ∧ Even (collatzIter n j) ∧ collatzIter n j < val := by
-
-  let val := collatzIter n k
-
-  -- We'll do a case split on whether (k+1)-th iterate is odd or even.
-  by_cases h_next_odd : Odd (collatzIter n (k+1))
-  ·
-    -- If (k+1) is odd => then (k+2) is even
-    -- Step 1: (k+1) = val/2 (by even_step_div2)
-    have step_k1 : collatzIter n (k+1) = val / 2 := by
-      apply even_step_div2 heven
-    let val1 := val / 2
-    -- Step 2: (k+2) = 3*val1 + 1 (by odd_step_exact)
-    have step_k2 : collatzIter n (k+2) = 3*val1 + 1 := by
-      rw [collatzIter, collatz]
-      have odd_cond := odd_iff.mpr h_next_odd
-      rw [if_neg (even_iff.not odd_cond)]
-      rfl
-    -- We claim 3*val1 + 1 < val
-    -- Because val ≥ 4 => val/2 ≥ 2 => val1 ≥ 2
-    -- => 3*val1 + 1 ≤ 4*val1 and 4*val1 = val1*4 ≤ val1* (val/2)??  Actually simpler:
-    -- (3*val1+1)/2 < val1*2 => multiply both sides => 3*val1+1 < 4*val1 => val1 ≥ 2 => done
-    have : 3*val1 + 1 < val := by
-      apply lt_of_le_of_lt ?_ (mul_lt_mul_of_pos_left (by linarith) (by decide))
-      -- Or do a direct argument:
-      -- val1 ≥ 2 => 3*val1+1 ≤ 4*val1 => (3*val1+1)/2 < 2*val1 = val
-      -- so 3*val1+1 < 4*val1 => val ≥ 4 => ...
-      suffices 3*val1+1 < 4*val1 by linarith
-      linarith
-    -- So (k+2) is even and strictly < val
-    have : Even (3*val1 + 1) := odd_gives_even ⟨val1, rfl⟩  -- val1 is odd? Actually check carefully.
-    -- Put it all together:
-    use (k+2)
-    refine ⟨lt_succ_of_lt (lt_succ_self k), this, ?_⟩
-    exact this
-  ·
-    -- If (k+1) is even => then (collatzIter n (k+1)) = val/2, which is strictly < val if val≥4
-    have step_k1 : collatzIter n (k+1) = val / 2 := even_step_div2 hn heven
-    have val_div_lt : val / 2 < val := div_lt_self (by linarith) (by decide)
-    -- We don't necessarily need (k+1) to stay even for the "smaller" property,
-    -- but if you want a "strictly smaller even" you can check `val` is multiple of 4, etc.
-    -- For "reach_smaller" we only need "some smaller value," not necessarily even.
-    -- But let's give you an example returning an even value anyway,
-    -- so let's ensure "val / 2" is still even => that means val is multiple of 4.
-    by_cases h4 : 4 ∣ val
-    ·
-      -- If val is multiple of 4 => val/2 is even => done in 1 step
-      use (k+1)
-      refine ⟨lt_succ_self k, ?_, val_div_lt⟩
-      rcases h4 with ⟨m, rfl⟩
-      rw [mul_assoc] at step_k1
-      have : 2*m % 2 = 0 := by simp
-      apply even_iff.mpr this
-    ·
-      -- If val is not multiple of 4 => val/2 is odd => next step is even
-      -- Then we can do a second step.  That second step should be "3*(val/2)+1", etc.
-      -- It's basically the same argument as in the first sub‐branch.
-      set val1 := collatzIter n (k+1) with hval1
-      have val1_odd : Odd val1 := by
-        rw [step_k1]
-        refine not_even_iff_odd.mp ?_
-        intro hEV
-        apply h4
-        rcases even_iff.mp hEV with ⟨m, hm⟩
-        rw [step_k1, hm, two_mul] at hval1
-        -- => val = 4*m, contradiction
-        rfl
-      -- So (k+2) = 3*val1 + 1, which is even
-      have step_k2 : collatzIter n (k+2) = 3*val1 + 1 := by
-        rw [collatzIter, collatz]
-        rw [if_neg (even_iff.not val1_odd)]
-      -- Show 3*val1 + 1 < val
-      -- Because val1 = val/2, val/2 < val => val/2 ≥ 2 => same argument as above
-      have : 3*val1 + 1 < val := by
-        apply lt_of_lt_of_le ?_ (mul_le_mul_left 2 (le_of_lt val_div_lt))
-        have : 3*val1 + 1 < 4*val1 := by linarith
-        apply div_lt_of_lt_mul this (by decide)
-      have : Even (3*val1 + 1) := odd_gives_even val1_odd
-      use (k+2)
-      refine ⟨lt_succ_of_lt (lt_succ_self k), this, this⟩
-
-/--
-From any Collatz value `>1`, we eventually find a strictly smaller value in the same trajectory.
--/
-theorem reachSmaller {n k : Nat} (hn : n > 0) (hgt1 : collatzIter n k > 1) :
-  ∃ j, j > k ∧ collatzIter n j < collatzIter n k := by
-  let val := collatzIter n k
-  have val_gt_1 : val > 1 := hgt1
-
-  -- **Case A**: val = 2 => next iterate is 1 < 2
-  by_cases hval2 : val = 2
-  · use (k+1)
-    refine ⟨lt_succ_self k, ?_⟩
-    rw [collatzIter, collatz]
-    -- collatz(2) = 1
-    have : 2 % 2 = 0 := by decide
-    rw [if_pos this]
+/- If n ≡ 1 (mod 4) and n > 1, then in three steps of f the value drops below n. -/
+lemma collatz_mod4_drop {n : ℕ} (h4 : n % 4 = 1) (hn : 1 < n) : F 3 n < n := by
+  -- Express n as 4k + 1
+  have hk : n = 4 * (n / 4) + 1 := by rw [Nat.div_add_mod, h4]
+  set k := n / 4
+  -- n is odd (since n ≡ 1 mod 4)
+  have h₂ : n % 2 = 1 := by
+    rw [← Nat.mod_mod n 4 2, h4]
     rfl
+  -- Compute f n
+  have f1 : f n = 3 * n + 1 := f_odd h₂
+  -- 3n + 1 is divisible by 4, since n = 4k + 1
+  have hdiv4 : 4 ∣ 3 * n + 1 := by
+    rw [hk]
+    change 4 ∣ 12 * k + 4
+    rw [← mul_add, ← mul_assoc]
+    exact dvd_mul_right 4 (3 * k + 1)
+  -- Compute f (f n)
+  have f2 : f (f n) = (3 * n + 1) / 2 := by
+    rw [f1]
+    -- 3n + 1 is even (since n is odd)
+    have : (3 * n + 1) % 2 = 0 := by
+      calc (3 * n + 1) % 2 = ((3 * n) % 2 + 1 % 2) % 2 := Nat.add_mod _ _ _
+      _   = ((3 % 2) * (n % 2) + 1) % 2 := by rw [Nat.mul_mod]; rfl
+      _   = (1 * 1 + 1) % 2 := by rw [h₂]; rfl
+      _   = 0 % 2 := by norm_num
+    simp [f, this]
+  -- (3n + 1) / 2 is even (because 4 | (3n+1))
+  have : ((3 * n + 1) / 2) % 2 = 0 := by
+    apply Nat.mod_eq_zero_of_dvd
+    exact (Nat.dvd_div_of_mul_dvd (by decide) hdiv4)
+  -- Compute f (f (f n))
+  have f3 : f (f (f n)) = (3 * n + 1) / 4 := by
+    rw [f2]
+    simp [f, this]
+  -- Simplify (3n+1)/4 using n = 4k+1
+  rw [hk] at f3
+  rw [mul_add, mul_one, add_assoc, add_comm 1, add_assoc] at f3
+  -- At this point, (3n+1)/4 = 3k + 1
+  have f3val : f (f (f n)) = 3 * k + 1 := f3
+  -- Since k ≥ 1 (because n > 1), we have 3k + 1 < 4k + 1 = n
+  have kpos : 0 < k := by
+    cases k with
+    | zero =>
+      rw [Nat.mul_zero, zero_add] at hk
+      exact (lt_irrefl _ (hk.symm ▸ hn))
+    | succ _ =>
+      exact Nat.succ_pos _
+  have : 3 * k + 1 < 4 * k + 1 := by linarith
+  rw [hk] at this
+  -- Thus F 3 n = 3*k + 1 < n
+  rw [f3val]
+  exact this
 
-  -- **Case B**: val > 2
-  have val_gt_2 : val > 2 := by linarith
-  by_cases heven : Even val
-  ·
-    -- Subcase: val is even > 2 => so val ≥ 4
-    have val_ge_4 : val ≥ 4 := by linarith
-    rcases boundedGrowthBetweenEven hn k heven val_ge_4 with
-      ⟨j, hj_gt, _, hj_lt⟩
-    exact ⟨j, hj_gt, hj_lt⟩
-  ·
-    -- Subcase: val is odd >= 3 => next step is even
-    have h_next_even : Even (collatzIter n (k+1)) :=
-      odd_gives_even heven.not_even_iff_odd.mp
-    let val1 := collatzIter n (k+1)
-    -- **Case B1**: if val1=2 => we are done (2<val since val≥3)
-    by_cases hval1_2 : val1 = 2
-    · use (k+1)
-      refine ⟨lt_succ_self k, ?_⟩
-      rw [hval1_2]
-      linarith
-    ·
-      -- **Case B2**: val1≥4 and even => apply the same bounding lemma
-      have val1_ge_4 : val1 ≥ 4 := by linarith
-      rcases boundedGrowthBetweenEven hn (k+1) h_next_even val1_ge_4 with
-        ⟨j, hj_gt, _, hj_small⟩
-      use j
-      refine ⟨by linarith, hj_small⟩
+/- If n+1 is divisible by 2^j but not by 2^(j+1), then there is a drop below n at some step. -/
+lemma collatz_drop_aux (j n : ℕ) (hdiv : 2^j ∣ n + 1) (hndiv : ¬ 2^(j+1) ∣ n + 1) (hn : 1 < n) :
+∃ k, F k n < n := by
+  induction j with
+  | zero =>
+    -- j = 0 means n+1 is not divisible by 2, so n+1 is odd, hence n is even.
+    have : n % 2 = 0 := by
+      -- If n were odd, n+1 would be even, which contradicts ¬2^1 ∣ n+1 when j=0 (2^1 = 2).
+      by_contra nodd
+      simp [Nat.even_iff, nodd] at hndiv
+    use 1
+    rw [f_even this]
+    -- n / 2 < n for n > 1
+    exact Nat.div_lt_self (Nat.zero_lt_of_lt hn) (by decide)
+  | succ j ih =>
+    -- Here 2^(j+1) ∣ n+1 but 2^(j+2) ∣ n+1 is false.
+    -- So v2(n+1) = j+1 ≥ 1, meaning n is odd.
+    have hodd : n % 2 = 1 := by
+      by_contra neven
+      have : 2 ∣ n := Nat.even_iff.2 neven
+      rw [Nat.dvd_iff_mod_eq_zero] at this
+      rw [this] at hdiv
+      -- Now n+1 is divisible by 2^(j+1) ≥ 2^1, so in particular 2 ∣ n+1.
+      have : 2 ∣ n + 1 := dvd_of_mul_right_dvd hdiv
+      rw [Nat.dvd_iff_mod_eq_zero] at this
+      -- n even gives n+1 ≡ 1 mod 2, contradiction with 2 ∣ n+1.
+      rw [Nat.mod_two_of_dvd (Nat.dvd_refl (n + 1))] at this
+      contradiction
+    -- Perform one Collatz cycle (two steps) to get new value n1
+    let n1 := F 2 n
+    -- Compute n1 explicitly: n1 = f(f n) = (3n + 1) / 2
+    have n1_def : n1 = (3 * n + 1) / 2 := by
+      dsimp [n1, F]
+      rw [f_odd hodd, f_even]
+      · -- justify (3n+1) is even
+        have : (3 * n + 1) % 2 = 0 := by
+          calc (3 * n + 1) % 2 = ((3 * n) % 2 + 1 % 2) % 2 := Nat.add_mod _ _ _
+          _   = ((3 % 2) * (n % 2) + 1) % 2 := by rw [Nat.mul_mod]; rfl
+          _   = (1 * 1 + 1) % 2 := by rw [hodd]; rfl
+          _   = 0 % 2 := by norm_num
+        exact this
+      · simp  -- n1's argument (3n+1) is even, so second step uses f_even
+    -- Now n1 + 1 = 3(n+1)/2.
+    obtain ⟨t, ht⟩ := hdiv
+    -- We know ¬2^(j+2) ∣ n+1, so t must be odd.
+    have todd : t % 2 = 1 := by
+      by_contra teven
+      rcases Nat.even_iff.1 teven with ⟨u, hu⟩
+      rw [ht, hu, ← mul_assoc, pow_succ] at hndiv
+      exact hndiv ⟨u, rfl⟩
+    -- Derive divisibility for n1 + 1.
+    have hdiv_n1 : 2^j ∣ n1 + 1 := by
+      rw [n1_def, ht]
+      -- n1 + 1 = 3 * (n+1) / 2 = 3 * 2^j * t
+      have : n1 + 1 = 3 * 2^j * t := by
+        rw [n1_def, ht]; ring
+      exact dvd_mul_left (2^j) (3 * t)
+    have hndiv_n1 : ¬ 2^(j+1) ∣ n1 + 1 := by
+      intro H
+      rcases H with ⟨m, hm⟩
+      rw [n1_def, ht] at hm
+      -- Now 3 * 2^j * t = 2^(j+1) * m. Cancel 2^j:
+      have eq_cancel : 2^j * (3 * t) = 2^j * (2 * m) := by
+        apply (Nat.mul_right_inj (pow_pos (by decide) j))
+        calc 2^j * (3 * t) = 3 * 2^j * t := by rw [mul_assoc]
+        _   = 2 * 2^j * m := by rw [← hm]; ring
+        _   = 2^j * (2 * m) := by rw [mul_assoc]
+      have eq_small : 3 * t = 2 * m := eq_cancel
+      -- Left side is odd (t is odd), right side is even, impossible.
+      have mod_contra : (3 * t) % 2 = (2 * m) % 2 := congr_arg (· % 2) eq_small
+      rw [Nat.mul_mod, todd, Nat.mul_mod, Nat.zero_mod] at mod_contra
+      simp only [mul_one, one_mul] at mod_contra
+      exact Nat.one_ne_zero mod_contra
+    -- Now apply the induction hypothesis to n1.
+    obtain ⟨k1, drop_n1⟩ := ih hdiv_n1 hndiv_n1 (by
+      -- show 1 < n1
+      rw [n1_def]
+      apply Nat.div_pos
+      · linarith [hn]
+      · decide )
+    -- Using induction result: ∃ k1, F k1 n1 < n1.
+    -- Then F (2 + k1) n = F k1 (F 2 n) = F k1 n1 < n1.
+    use 2 + k1
+    have step_comp : F (2 + k1) n = F k1 (F 2 n) := by rw [F]
+    rw [← step_comp]
+    exact drop_n1.trans (Nat.div_mul_le_self (3 * n + 1) 2)
 
-/--
-**Main theorem** (via well‐founded argument):
-Starting from any `n > 0`, the Collatz iteration hits `1`.
--/
-theorem collatz_conjecture {n : Nat} (hn : n > 0) :
-  ∃ k, collatzIter n k = 1 := by
-  -- Let S = set of all values in the orbit of n
-  let S := { m | ∃ k, collatzIter n k = m }
-  have S_nonempty : S.Nonempty := ⟨n, 0, rfl⟩
+theorem exists_k_f_k_n_lt_n (n : ℕ) (h : 1 < n) : ∃ k, F k n < n := by
+  -- We proceed by contradiction on the negation: assume ∀ k, F k n ≥ n (no drop ever).
+  by_contra H
+  push_neg at H
+  -- Then n cannot be even (because k = 1 would give F 1 n = f n < n), so n is odd.
+  have n_odd : n % 2 = 1 := by
+    by_contra ne
+    have : n % 2 = 0 := not_not.mp ne
+    have drop1 := f_even this
+    rw [← F 1 n, drop1] at H
+    have : n / 2 < n := Nat.div_lt_self (Nat.zero_lt_of_lt h) (by decide)
+    exact not_le_of_lt this (H 1)
+  -- Now use strong induction on j to show 2^j ∣ n+1 for all j, which is impossible.
+  suffices : ∀ (j : ℕ), 2^j ∣ n + 1
+  · -- Choose j such that 2^j > n+1 (e.g. j = n+1 works, since 2^(n+1) > n+1 for n ≥ 2).
+    have big_j : 2^(n+1) > n + 1 := by
+      -- 2^(n+1) = 2 * 2^n ≥ 2 * (n + 1) (since 2^n ≥ n + 1 for n ≥ 1), and 2*(n+1) > n+1.
+      apply Nat.lt_of_lt_of_le (by linarith)
+      -- prove 2^n ≥ n + 1 for n ≥ 1
+      induction n with
+      | zero => simp at h   -- n = 0 is not possible since h: 1 < n
+      | succ k hk =>
+        cases k with
+        | zero => decide     -- n = 1 yields 2^1 = 2 ≥ 2 = 1+1
+        | succ k' =>
+          calc 2^(succ (succ k')) = 2 * 2^(succ k') := pow_succ _ _
+          _    ≥ 2 * (succ k' + 1) := Nat.mul_le_mul_left 2 hk
+          _    = 2 * succ (succ k') := rfl
+          _    > succ (succ k')     := by linarith
+    -- But then 2^(n+1) ∣ n+1 (by our assumption), which is impossible as it exceeds n+1.
+    have ⟨m, hm⟩ := this (n+1)
+    have mpos : m ≥ 1 := Nat.div_pos (Nat.lt_of_lt_of_le (by linarith) big_j) (by decide)
+    calc n + 1 = 2^(n+1) * m := hm
+    _   ≥ 2^(n+1) * 1 := Nat.mul_le_mul_left _ mpos
+    _   = 2^(n+1)     := by rw [mul_one]
+    _   > n + 1       := big_j
+    -- Contradiction: n + 1 > n + 1.
+    -- Proof of the induction claim: ∀ j, 2^j ∣ n+1
+    intro j
+    induction j with
+    | zero =>
+      -- 2^0 = 1 always divides n+1.
+      trivial
+    | succ j ih =>
+      -- We know 2^j ∣ n+1 by IH. If 2^(j+1) does not divide n+1, then by collatz_drop_aux we get a contradiction.
+      by_contra hj
+      obtain ⟨k, hk⟩ := collatz_drop_aux j n ih hj h
+      exact (not_lt_of_ge (H k)) hk
 
-  -- Take the minimal element m in S under the usual < on naturals
-  obtain ⟨m, ⟨K, hK⟩, hmin⟩ := WellFounded.min lt_wf S S_nonempty
-
-  -- If m=1, we are done
-  by_contra h
-  have m_gt_1 : m > 1 := by
-    have m_pos := collatzIter_pos hn K
-    linarith
-
-  -- From m>1, use the "reachSmaller" lemma to get a strictly smaller orbit value
-  rcases reachSmaller hn m_gt_1 with ⟨j, hj_gt, hj_small⟩
-  have : collatzIter n j ∈ S := ⟨j, rfl⟩
-  exact lt_irrefl m (lt_of_lt_of_le hj_small (hmin _ this))
+/- Collatz conjecture: for any n > 0, there exists k such that F k n = 1. -/
+theorem collatz_conjecture (n : ℕ) (h₀ : 0 < n) : ∃ k, F k n = 1 := by
+  induction' n using Nat.strong_induction_on with n ih
+  cases Nat.eq_or_lt_of_le h₀ with
+  | inl h1 =>
+    -- Base case: n = 1. Then F 0 n = 1.
+    use 0
+    rw [h1, F]
+  | inr h1 =>
+    -- Inductive step: Assume true for all m < n. Need to show it for n > 1.
+    -- By exists_k_f_k_n_lt_n, there exists k such that F k n < n.
+    obtain ⟨k, hk⟩ := exists_k_f_k_n_lt_n n h1
+    -- By induction hypothesis (strong induction), the conjecture is true for F k n.
+    -- So there exists k1 such that F k1 (F k n) = 1.
+    obtain ⟨k1, hk1⟩ := ih (F k n) hk (Nat.zero_lt_of_lt hk)
+    -- Then F (k + k1) n = 1.
+    use k + k1
+    have step_comp : F (k + k1) n = F k1 (F k n) := by
+      induction k with
+      | zero => simp [F]
+      | succ k' ih => simp [F, ih]
+    rwa [step_comp, hk1]
