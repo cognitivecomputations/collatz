@@ -28,60 +28,6 @@ lemma f_even {n : ℕ} (h : n % 2 = 0) : f n = n / 2 := by
 lemma f_odd {n : ℕ} (h : n % 2 = 1) : f n = 3 * n + 1 := by
   simp [f, h]
 
-/- If n ≡ 1 (mod 4) and n > 1, then in three steps of f the value drops below n. -/
-lemma collatz_mod4_drop {n : ℕ} (h4 : n % 4 = 1) (hn : 1 < n) : F 3 n < n := by
-  -- Express n as 4k + 1
-  have hk : n = 4 * (n / 4) + 1 := by rw [Nat.div_add_mod, h4]
-  set k := n / 4
-  -- n is odd (since n ≡ 1 mod 4)
-  have h₂ : n % 2 = 1 := by
-    rw [← Nat.mod_mod n 4 2, h4]
-    rfl
-  -- Compute f n
-  have f1 : f n = 3 * n + 1 := f_odd h₂
-  -- 3n + 1 is divisible by 4, since n = 4k + 1
-  have hdiv4 : 4 ∣ 3 * n + 1 := by
-    rw [hk]
-    change 4 ∣ 12 * k + 4
-    rw [← mul_add, ← mul_assoc]
-    exact dvd_mul_right 4 (3 * k + 1)
-  -- Compute f (f n)
-  have f2 : f (f n) = (3 * n + 1) / 2 := by
-    rw [f1]
-    -- 3n + 1 is even (since n is odd)
-    have : (3 * n + 1) % 2 = 0 := by
-      calc (3 * n + 1) % 2 = ((3 * n) % 2 + 1 % 2) % 2 := Nat.add_mod _ _ _
-      _   = ((3 % 2) * (n % 2) + 1) % 2 := by rw [Nat.mul_mod]; rfl
-      _   = (1 * 1 + 1) % 2 := by rw [h₂]; rfl
-      _   = 0 % 2 := by norm_num
-    simp [f, this]
-  -- (3n + 1) / 2 is even (because 4 | (3n+1))
-  have : ((3 * n + 1) / 2) % 2 = 0 := by
-    apply Nat.mod_eq_zero_of_dvd
-    exact (Nat.dvd_div_of_mul_dvd (by decide) hdiv4)
-  -- Compute f (f (f n))
-  have f3 : f (f (f n)) = (3 * n + 1) / 4 := by
-    rw [f2]
-    simp [f, this]
-  -- Simplify (3n+1)/4 using n = 4k+1
-  rw [hk] at f3
-  rw [mul_add, mul_one, add_assoc, add_comm 1, add_assoc] at f3
-  -- At this point, (3n+1)/4 = 3k + 1
-  have f3val : f (f (f n)) = 3 * k + 1 := f3
-  -- Since k ≥ 1 (because n > 1), we have 3k + 1 < 4k + 1 = n
-  have kpos : 0 < k := by
-    cases k with
-    | zero =>
-      rw [Nat.mul_zero, zero_add] at hk
-      exact (lt_irrefl _ (hk.symm ▸ hn))
-    | succ _ =>
-      exact Nat.succ_pos _
-  have : 3 * k + 1 < 4 * k + 1 := by linarith
-  rw [hk] at this
-  -- Thus F 3 n = 3*k + 1 < n
-  rw [f3val]
-  exact this
-
 /- If n+1 is divisible by 2^j but not by 2^(j+1), then there is a drop below n at some step. -/
 lemma collatz_drop_aux (j n : ℕ) (hdiv : 2^j ∣ n + 1) (hndiv : ¬ 2^(j+1) ∣ n + 1) (hn : 1 < n) :
 ∃ k, F k n < n := by
