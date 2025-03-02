@@ -1,31 +1,18 @@
 import Mathlib
-import Mathlib.Data.Nat.Basic
-import Mathlib.Data.Real.Basic
-import Mathlib.Tactic
-import Mathlib.Data.Finset.Basic
-import Mathlib.Analysis.SpecialFunctions.Log.Basic
 
 open Nat
-
-/-!
-# Complete Formalization of the Collatz Conjecture via Collatz Potential (CP)
-
-This formalization defines the Collatz Potential (CP) explicitly and proves the Collatz Conjecture
-by demonstrating that assuming no descent leads to a contradiction via unbounded CP growth, while
-interval density bounds enforce a finite CP limit, thus ensuring eventual descent.
--/-
 
 def f (n : ℕ) : ℕ :=
   if n % 2 = 0 then n / 2 else 3 * n + 1
 
 def F : ℕ → ℕ → ℕ
 | 0,     n => n
-| (k+1), n => F k (f n)
+| (k+1), n => f (F k n)
 
 def DescendantsWithin (n k : ℕ) : Finset ℕ :=
   (Finset.range (k+1)).image (λ i => F i n)
 
-def CP (n k : ℕ) : ℝ :=
+noncomputable def CP (n k : ℕ) : ℝ :=
   ((DescendantsWithin n k).card : ℝ) / (n : ℝ)
 
 noncomputable def CPLimit (n : ℕ) : ℝ :=
@@ -34,27 +21,88 @@ noncomputable def CPLimit (n : ℕ) : ℝ :=
 lemma f_even {n : ℕ} (h : n % 2 = 0) : f n = n / 2 := by simp [f, h]
 lemma f_odd {n : ℕ} (h : n % 2 = 1) : f n = 3 * n + 1 := by simp [f, h]
 
-lemma distinct_values {n : ℕ} (hn : n > 0) (h : ∀ k, F k n ≥ n) :
-  ∀ i j, i < j → F i n ≠ F j n := by
-  intros i j hij heq
-  let cycle_len := j - i
-  have cycle : F cycle_len (F i n) = F i n := by
-    induction cycle_len generalizing i
-    · simp [F]
-    · simp [F, *]
-  have descent : ∃ l < cycle_len, F l (F i n) < F i n := by
-    by_contra nod
-    push_neg at nod
-    have monotone : ∀ l ≤ cycle_len, F l (F i n) ≥ F i n := by
+lemma F_add (k m n : ℕ) : F (k + m) n = F k (F m n) := by
+  induction k generalizing m with
+  | zero =>
+    simp [F]
+  | succ k ih =>
+    simp [Nat.succ_add, F, ih]
+
+lemma Nat.le_of_ge {a b : ℕ} (h : a ≥ b) : b ≤ a := h
+lemma Nat.le_div_of_mul_le_of_pos {a b c : ℕ} (hb : 0 < b) (h : a * b ≤ c) : a ≤ c / b := by
+  rw [Nat.le_div_iff_mul_le hb]
+  exact h
+
+
+/--
+If we assume all iterates of `n` never drop below `n`, then `F i n` must all be distinct.
+Otherwise, we get a cycle that forces a descent, contradicting the hypothesis.
+-/
+lemma distinct_values {n : ℕ} (hn : n > 0) (never_below : ∀ k, F k n ≥ n) :
+    ∀ i j, i < j → F i n ≠ F j n := by
+  intros i j hij eq
+  let d := j - i
+  have cycle : F d (F i n) = F i n := by
+    calc
+      F d (F i n)
+        = F (d + i) n := (F_add d i n).symm
+      _ = F j n := by rw [Nat.add_comm d i, Nat.add_sub_of_le (Nat.le_of_lt hij)]
+      _ = F i n := eq.symm
+  -- The remainder shows a cycle must create a descent < n, a contradiction:
+  have cycle_forces_descent : ∃ l < d, F l (F i n) < F i n := by
+    by_contra no_descent
+    push_neg at no_descent
+    have non_decreasing : ∀ l ≤ d, F l (F i n) ≥ F i n := by
       intro l hl
-      induction l
-      · simp [F]
-      · simp [F]; split_ifs
-        · exact Nat.le_trans (Nat.div_le_self _ _) (by assumption)
-        · linarith
-    linarith [monotone cycle_len (le_refl _)]
-  obtain ⟨l, hl, hlt⟩ := descent
-  exact lt_irrefl _ (by linarith [h (i+l)])
+      induction l with
+      | zero =>
+        simp [F] -- unfolds F 0 (F i n) to F i n
+
+      | succ l' ih =>
+        let step := F l' (F i n)
+        by_cases h_even : step % 2 = 0
+        ·
+          have step_even : F (l'+1) (F i n) = step / 2 := by
+            rw [F]
+            rw [← show F l' (F i n) = step from rfl]
+            rw [f_even h_even]
+          have step_ge : step ≥ F i n := no_descent l' (Nat.lt_of_succ_le hl)
+          by_cases h_step : step ≥ 2 * F i n
+          ·
+            rw [step_even]
+            apply le_div_of_mul_le_of_pos (by norm_num)  -- prove 0 < 2
+            rw [mul_comm]
+            exact h_step
+          · -- step < 2*F i n => step/2 < F i n => contradiction with step ≥ F i n
+            have : step / 2 < F i n := Nat.div_lt_of_lt_mul (lt_of_not_ge h_step)
+            exact (lt_irrefl _ (lt_of_lt_of_le this step_ge)).elim
+        · have : F (l'+1) (F i n) = 3 * step + 1 := by simp [F, f, h_even]
+          linarith
+    have increase : F d (F i n) > F i n := by
+      have exists_odd : ∃ l < d, F l (F i n) % 2 = 1 := by
+        by_contra all_even
+        push_neg at all_even
+        have evens_shrink : ∃ l < d, F (l+1) (F i n) < F i n := by
+          use 0
+          simp [F, f, all_even 0 (Nat.lt_of_sub_pos (Nat.sub_pos_of_lt hij))]
+          exact Nat.div_lt_self (never_below i) (by norm_num)
+        exact no_descent _ evens_shrink.choose_spec evens_shrink.choose_spec
+      obtain ⟨l, hl, odd_step⟩ := exists_odd
+      calc
+        F d (F i n)
+          ≥ F (l+1) (F i n)  := non_decreasing (l+1) (Nat.succ_le_of_lt hl)
+        _ = 3 * F l (F i n) + 1 := by simp [F, f, odd_step]
+        _ ≥ 3 * F i n + 1 := by linarith [non_decreasing l (Nat.le_of_lt hl)]
+        _ > F i n := by linarith
+    exact lt_irrefl _ (by linarith [cycle, increase])
+  obtain ⟨l, hl, descent⟩ := cycle_forces_descent
+  have descent_original : F (i + l) n < n := by
+    calc
+      F (i + l) n
+        = F l (F i n) := by rw [F_add]
+      _ < F i n := descent
+      _ ≥ n := never_below i
+  exact lt_irrefl _ (by linarith [never_below (i + l), descent_original])
 
 lemma CP_pos {n k : ℕ} (hn : n > 0) : CP n k > 0 := by
   have : (DescendantsWithin n k).card > 0 := by
