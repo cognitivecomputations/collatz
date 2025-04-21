@@ -105,3 +105,35 @@ This part uses arguments related to 2-adic properties and the instability of the
 3.  Conclude that every trajectory must be bounded and cannot enter a non-trivial cycle. By standard arguments (e.g., minimum value reached in a finite set), it must eventually reach the only remaining attractor: 1.
 
 This combined approach provides a plausible pathway by tackling the two failure modes separately using sophisticated techniques from different mathematical areas. The formalization highlights where known elementary arguments suffice and where deeper, currently unproven (or unformalized) results are required.
+
+## Formalization Status: What is Proven and What Remains Axiomatic
+
+This Lean 4 project provides a rigorous, formalized **framework** for proving the Collatz Conjecture, based on decomposing the problem into **cycle exclusion** and **non-divergence**. It successfully formalizes many underlying definitions, lemmas, and argument structures, but ultimately relies on assuming certain deep mathematical results or unproven properties as **axioms**.
+
+**What is Formally Defined and Proven:**
+
+1.  **Core Functions:** The standard Collatz step `f(n)` and the Syracuse ("halved") map `S(n)` (acting on odd integers) are defined, along with their iteration `F k n` and `S_iter k n`.
+2.  **Valuations:** The 2-adic valuation `ν₂(n)` (as `Nat.trailingZeros`) and the parameter `a(n) = ν₂(n+1)` are defined.
+3.  **Key Local Dynamics:** The two crucial lemmas governing the behavior of `a(n)` under the Syracuse map `S` are proven:
+    *   `nextOdd_lt`: If `a(n)=1` (i.e., `n ≡ 1 [mod 4]`) and `n>1`, then `S(n) < n`. (Descent is guaranteed).
+    *   `a_nextOdd`: If `a(n)>1`, then `a(S n) = a(n)-1`. (`a` decreases until it hits 1).
+4.  **Cycle Equation Structure:** The algebraic equation governing cycles, `n * (2^e - 3^o) = b_k`, is derived, linking the starting element `n` to the cycle parameters (`o` odd steps, `e` even steps) and a path-dependent term `b_k`. The formula for `b_k` involving sums of powers of 2 and 3 is established.
+5.  **Basic Cycle Constraints:** Elementary consequences, such as `3^o < 2^e` and `k = o+e ≥ 3` (for non-trivial cycles), are derivable from the framework. The fact that `2^e - 3^o = 1` implies the trivial cycle `{1, 2, 4}` (assuming Catalan's/Mihăilescu's Theorem) is also included.
+6.  **2-adic Instability Lemmas:** The lemmas `nextOdd_mod_lower` and `nextOdd_mod_drop` are proven, demonstrating how the map `S` interacts with congruences of the form `n ≡ -1 [mod 2^A]`. This shows that the specific 2-adic structure associated with minimal `ν₂(3n+1)` values is dynamically unstable.
+7.  **Final Proof Structure:** The overall proof structure – assuming cycle exclusion and non-divergence, then concluding termination via well-foundedness or properties of bounded sequences – is formally sound.
+
+**What Remains Axiomatic or Unproven (The Gaps):**
+
+1.  **Complete Cycle Exclusion:**
+    *   The argument to rule out *all* non-trivial cycles relies on showing that a specific sum involving powers of `α = 2 * 3⁻¹` in `ZMod (2^e - 3^o)` is non-zero (`no_zero_sum_of_powers`). While related to standard theorems about roots of unity, proving it for the *specific* exponents arising from Collatz paths is non-trivial.
+    *   Furthermore, the contradiction requires showing `o < orderOf(α)`. Proving this lower bound on the order of `α` necessitates deep results from Diophantine approximation or analytic number theory (like Baker's method), which are **stated as axioms** (`orderOf_alpha_lower_bound`) in the formal sketch. Formalizing these deep theorems is beyond current standard mathematical libraries.
+
+2.  **Rigorous Proof of Non-Divergence:**
+    *   While the `nextOdd_mod_lower/drop` lemmas demonstrate the *instability* of the 2-adic state required for divergence (sustained `k=ν₂(3n+1)=1`), translating this local instability into a *universal proof* that *no* sequence can diverge (`no_divergence` lemma) is a significant leap.
+    *   This step essentially requires proving that the heuristic/average behavior (where `E[ν₂(3n+1)] ≈ 2 > log₂ 3`) rigorously holds for *all* integer trajectories in the long run, preventing the sustained statistical bias needed for divergence. This connection relies on unproven assumptions about the ergodic properties of Collatz iterations on integers or finding a suitable potential function. The `no_divergence` lemma is **stated as an axiom** representing this gap.
+
+3.  **Termination Argument Details:** While the overall structure using boundedness and cycle exclusion is sound, the final step (showing a bounded sequence with no non-trivial cycles must reach 1) requires careful formalization using properties of finite sets or well-founded relations, replacing the slightly circular `collatz_bounded` sketch. This part is achievable but needs explicit proof.
+
+**In Summary:**
+
+The formalization successfully captures much of the known structure and many relevant arguments surrounding the Collatz conjecture. It rigorously proves key local dynamics (`a(n)=1 ⇒ drop`, `a(n)>1 ⇒ a` decreases) and sets up advanced arguments for cycle exclusion and non-divergence. However, it cannot be completed without incorporating (as axioms or by future formalization) deep results from number theory (for cycle exclusion) and dynamical systems/ergodic theory (for non-divergence). The project clarifies precisely where these advanced results interface with the elementary steps of the Collatz iteration.
