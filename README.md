@@ -1,8 +1,5 @@
 # A Formalized Proof Strategy for the Collatz Conjecture in Lean 4
 
-**Target Audience:** Mathematics Postgraduate Researchers (Number Theory Focus)
-**Environment:** Lean 4 / Mathlib
-
 ## Introduction
 
 The Collatz Conjecture posits that iterating the function $f(n) = n/2$ (if $n$ even) or $f(n) = 3n+1$ (if $n$ odd) eventually leads to the number 1 for any starting integer $n > 0$. Despite its simple statement, the conjecture remains unproven.
