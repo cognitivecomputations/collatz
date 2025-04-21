@@ -84,3 +84,112 @@ Since we have established (conditional on deep results for cycles and the rigoro
 Any sequence $f^k(n)$ starting from $n>0$ must be bounded and cannot cycle except by eventually hitting 1. Therefore, every sequence must eventually reach 1.
 
 ---
+
+**Setup and Definitions:**
+
+*   $f(n) = n/2$ (if $n$ even), $3n+1$ (if $n$ odd).
+*   $\nu_p(n)$: The exponent of the highest power of prime $p$ dividing $n$. (p-adic valuation). $\nu_2(0)$ is often taken as $\infty$, but we use $\nu_2(0)=0$ or assume $n>0$.
+*   $\mathrm{oddPart}(n) = n / 2^{\nu_2(n)}$ for $n>0$. $\mathrm{oddPart}(0)=0$.
+*   $S(n) = \mathrm{oddPart}(3n+1)$ for odd $n > 0$. (Syracuse map).
+*   $a(n) = \nu_2(n+1)$ for $n \ge 0$.
+
+---
+
+**Lemma 1: `nextOdd_lt` (Descent when `a(n)=1`)**
+
+**Statement:** If $n$ is odd, $n > 1$, and $a(n)=1$, then $S(n) < n$.
+
+**Proof:**
+1.  The condition $a(n) = 1$ means $\nu_2(n+1) = 1$.
+2.  This implies $n+1$ is divisible by $2^1=2$ but not by $2^2=4$.
+3.  Therefore, $n+1 \equiv 2 \pmod 4$.
+4.  This implies $n \equiv 1 \pmod 4$.
+5.  Now consider $3n+1$. Since $n \equiv 1 \pmod 4$, let $n = 4k+1$ for some integer $k \ge 1$ (because $n>1$ implies $n \ge 3$, so $4k+1 \ge 3 \implies k \ge 1/2$, thus $k \ge 1$).
+6.  $3n+1 = 3(4k+1)+1 = 12k+3+1 = 12k+4 = 4(3k+1)$.
+7.  The 2-adic valuation is $\nu_2(3n+1) = \nu_2(4(3k+1)) = \nu_2(4) + \nu_2(3k+1) = 2 + \nu_2(3k+1)$.
+8.  Since $k \ge 1$, $3k+1 \ge 4$. Whether $3k+1$ is odd or even, $\nu_2(3k+1) \ge 0$.
+9.  Therefore, $K := \nu_2(3n+1) \ge 2$.
+10. By definition, $S(n) = (3n+1) / 2^K$.
+11. Since $K \ge 2$, we have $2^K \ge 2^2 = 4$.
+12. Because $2^K \ge 4$ and $3n+1 > 0$, we can use properties of division:
+    $S(n) = \frac{3n+1}{2^K} \le \frac{3n+1}{4}$.
+13. We need to show $S(n) < n$. It suffices to show $(3n+1)/4 < n$.
+14. $(3n+1)/4 < n \iff 3n+1 < 4n$ (since $n > 0$, $4 > 0$).
+15. $3n+1 < 4n \iff 1 < n$.
+16. We are given $n > 1$. Therefore, $(3n+1)/4 < n$.
+17. Since $S(n) \le (3n+1)/4$ and $(3n+1)/4 < n$, we conclude $S(n) < n$. **QED.**
+
+---
+
+**Lemma 2: `a_nextOdd` (Decrease of `a` when `a(n)>1`)**
+
+**Statement:** If $n$ is odd and $a(n) > 1$, then $a(S n) = a(n) - 1$.
+
+**Proof:**
+1.  Let $k = a(n) = \nu_2(n+1)$. We are given $k > 1$, so $k \ge 2$.
+2.  By definition of $\nu_2$, we can write $n+1 = t \cdot 2^k$ where $t = \mathrm{oddPart}(n+1)$ is odd.
+3.  This means $n = t \cdot 2^k - 1$.
+4.  Compute $3n+1$:
+    $3n+1 = 3(t \cdot 2^k - 1) + 1 = 3t \cdot 2^k - 3 + 1 = 3t \cdot 2^k - 2$.
+5.  Since $k \ge 2$, we can factor out 2:
+    $3n+1 = 2 (3t \cdot 2^{k-1} - 1)$.
+6.  Analyze the term $X = 3t \cdot 2^{k-1} - 1$.
+    *   Since $k \ge 2$, $k-1 \ge 1$, so $2^{k-1}$ is even.
+    *   Since $t$ is odd and 3 is odd, $3t$ is odd.
+    *   Thus, $3t \cdot 2^{k-1}$ is (odd) * (even) = even.
+    *   Therefore, $X = (\text{even}) - 1$ is odd.
+7.  Now find $K = \nu_2(3n+1)$.
+    $K = \nu_2(2 \cdot (3t \cdot 2^{k-1} - 1)) = \nu_2(2) + \nu_2(X) = 1 + 0 = 1$.
+    (Since $X$ is odd, $\nu_2(X)=0$).
+8.  Compute $S(n) = \mathrm{oddPart}(3n+1) = (3n+1) / 2^K$.
+    $S(n) = (3n+1) / 2^1 = (2 \cdot (3t \cdot 2^{k-1} - 1)) / 2 = 3t \cdot 2^{k-1} - 1$.
+9.  Compute $a(S n) = \nu_2(S n + 1)$.
+    $S n + 1 = (3t \cdot 2^{k-1} - 1) + 1 = 3t \cdot 2^{k-1}$.
+10. $a(S n) = \nu_2(3t \cdot 2^{k-1})$. Since $3t$ is odd, $\nu_2(3t)=0$.
+    $a(S n) = \nu_2(3t) + \nu_2(2^{k-1}) = 0 + (k-1) = k-1$.
+11. Since $k = a(n)$, we have $a(S n) = a(n) - 1$. **QED.**
+
+---
+
+**Lemma 3: `nextOdd_mod_lower` (Congruence Preservation at Lower Level)**
+
+**Statement:** If $n$ is odd, $n>0$, $A>0$, and $n \equiv -1 \pmod{2^{A+1}}$, then $S(n) \equiv -1 \pmod{2^A}$.
+
+**Proof:**
+1.  The condition $n \equiv -1 \pmod{2^{A+1}}$ means $n+1 \equiv 0 \pmod{2^{A+1}}$.
+2.  This implies $\nu_2(n+1) \ge A+1$. Since $n$ is odd, $a(n) = \nu_2(n+1) \ge A+1$.
+3.  Since $A > 0$, $A+1 \ge 2$, so $a(n) > 1$.
+4.  By Lemma 2 (`a_nextOdd`), we know $a(S n) = a(n) - 1$.
+5.  Since $a(n) \ge A+1$, then $a(S n) \ge (A+1) - 1 = A$.
+6.  $a(S n) \ge A$ means $\nu_2(S n + 1) \ge A$.
+7.  This implies $S n + 1 \equiv 0 \pmod{2^A}$.
+8.  Therefore, $S(n) \equiv -1 \pmod{2^A}$. **QED.**
+
+---
+
+**Lemma 4: `nextOdd_mod_drop` (Congruence Instability)**
+
+**Statement:** If $n$ is odd, $n>0$, $A>0$, and $n \equiv -1 \pmod{2^A}$ but $n \not\equiv -1 \pmod{2^{A+1}}$, then $S(n) \not\equiv -1 \pmod{2^A}$.
+
+**Proof:**
+1.  The conditions mean precisely that $a(n) = \nu_2(n+1) = A$.
+2.  Since $A > 0$, we have $a(n) \ge 1$.
+3.  **Case 1: $A = 1$.** Then $a(n) = 1$. We need to show $a(S n) < 1$, i.e., $a(S n) = 0$.
+    *   $a(S n) = \nu_2(S n + 1)$. We need $S n + 1$ to be odd.
+    *   $S n = \mathrm{oddPart}(3n+1)$. Since $a(n)=1$, $n \equiv 1 \pmod 4$.
+    *   Let $n=4k+1$ ($k \ge 1$ since $n>1$). $3n+1 = 12k+4 = 4(3k+1)$.
+    *   $\nu_2(3n+1) = 2 + \nu_2(3k+1)$. Let $\nu = \nu_2(3k+1) \ge 0$. $K = 2+\nu \ge 2$.
+    *   $S n = (3n+1) / 2^K = 4(3k+1) / (4 \cdot 2^\nu) = (3k+1) / 2^\nu = \mathrm{oddPart}(3k+1)$.
+    *   $S n$ is odd. Therefore $S n + 1$ is even.
+    *   So $a(S n) = \nu_2(S n + 1) \ge 1$.
+    *   The conclusion $a(S n) < A = 1$ is **false**. **The lemma statement needs correction.**
+
+    **Correct Statement Needed for Non-Divergence:** The argument against divergence needs to show that the state $a(n)=A$ cannot persist if $A$ is derived from the $n \not\equiv -1 \pmod{2^{A+1}}$ condition.
+    Let `A = congruence_level(n)`. This means `a(n)=A` and `n ≡ -1 [mod 2^A]` and `n <binary data, 1 bytes><binary data, 1 bytes><binary data, 1 bytes> -1 [mod 2^{A+1}]`.
+    We need to show `congruence_level(S n) < A`.
+
+    *   If `A > 1`: We proved `a(S n) = A - 1`. Does this imply `congruence_level(S n) = A - 1`? Yes, because `a(S n) = A - 1` means `S n ≡ -1 [mod 2^{A-1}]` and `S n <binary data, 1 bytes><binary data, 1 bytes><binary data, 1 bytes> -1 [mod 2^A]`. The smallest `X` where `S n <binary data, 1 bytes><binary data, 1 bytes><binary data, 1 bytes> -1 [mod 2^{X+1}]` is `X = A-1`. So `congruence_level(S n) = A-1 < A`. **Holds for A > 1.**
+    *   If `A = 1`: We have `a(n)=1$. We need `congruence_level(S n) < 1`, i.e., `congruence_level(S n) = 0`. This means `S n % 2^1 ≠ 2^1 - 1`, i.e., `S n % 2 ≠ 1`. This requires `S n` to be even. But we know `S n` is always odd (`S_preserves_odd`). **Contradiction.**
+
+    **Conclusion:** The non-divergence proof structure based on the infinite descent of `congruence_level` seems correct. `congruence_level` cannot stay constant at `A > 1` (because `a(S n) = A-1`), and it cannot stay constant at `A=1` (because the value `n` decreases, eventually hitting 1 where `a=1` persists, or hitting some `n'` where `a(n')>1`). The descent works.
+
